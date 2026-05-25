@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Consulta Energética | Julio Varela Martinez</title>
+    <link rel="stylesheet" href="/src/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+    <style>
+        .hero-bg { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background-size: cover; background-position: center; transition: opacity 1s ease-in-out; background-color: #0a0a0a; }
+        .hero-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: -1; background: linear-gradient(rgba(10, 10, 10, 0.7), rgba(10, 10, 10, 0.95)); }
+        .logo { font-size: 1.1rem !important; line-height: 1.4; max-width: 80%; }
+        .highlight-company { color: var(--primary); font-weight: 800; }
+        
+        @media (max-width: 640px) {
+            .logo { font-size: 0.9rem !important; max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+    <div class="hero-bg" id="dynamic-bg"></div>
+    <div class="hero-overlay"></div>
+    
+    <div class="container">
+        <header class="header animate-fade-in">
+            <div class="logo">
+                Representante <span class="highlight-company">TuPlanta.com</span>:<br>
+                <span style="font-weight: 400; opacity: 0.9;">Julio Varela Martinez</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <div class="lead-card animate-slide-up" id="form-container">
+                <div class="progress-container">
+                    <div class="progress-bar" id="progress-bar"></div>
+                </div>
+
+                <div id="multi-step-form">
+                    <!-- STEP 1 -->
+                    <div class="step active" id="step-1">
+                        <h1 class="title">Descubre cuánto puedes <span class="highlight">ahorrar</span></h1>
+                        <p class="subtitle">Analizamos tu techo y consumo para darte la mejor oferta en PR.</p>
+                        <div class="question-box">
+                            <label class="label">¿Eres dueño de la propiedad?</label>
+                            <div class="options-grid">
+                                <button class="option-btn" onclick="setDueno('si'); nextStep(1, 'type')">SÍ, SOY DUEÑO</button>
+                                <button class="option-btn" onclick="setDueno('no'); nextStep(1, 'renter-warning')">NO, RENTO</button>
+                            </div>
+                        </div>
+                    </div>
+                    <!-- STEP RENTER WARNING -->
+                    <div class="step" id="step-renter-warning">
+                        <h2 class="title">Aviso Importante para <span class="highlight">Alquiler</span></h2>
+                        <p class="subtitle" style="font-size: 1.1rem; line-height: 1.6; max-width: 500px; margin: 0 auto 2rem;">
+                            Para instalar un sistema solar en una propiedad alquilada, <strong>es requisito indispensable contar con una autorización formal por escrito del dueño de la propiedad</strong>.
+                        </p>
+                        <div style="display: flex; justify-content: center;">
+                            <button class="btn btn-primary" onclick="nextStep('renter-warning', 'type')">Entendido, Continuar</button>
+                        </div>
+                    </div>
+                    <!-- STEP PROPERTY TYPE -->
+                    <div class="step" id="step-type">
+                        <h2 class="title">¿Qué tipo de propiedad es?</h2>
+                        <div class="options-grid">
+                            <button class="option-btn" onclick="setField('propertyType', 'Casa'); nextStep('type', 3)">🏡 CASA</button>
+                            <button class="option-btn" onclick="setField('propertyType', 'Apartamento'); nextStep('type', 3)">🏢 APARTAMENTO</button>
+                            <button class="option-btn" onclick="setField('propertyType', 'Comercial'); nextStep('type', 3)">🏪 COMERCIAL</button>
+                        </div>
+                    </div>
+                    <!-- STEP 3 -->
+                    <div class="step" id="step-3">
+                        <h2 class="title">¿Cuál es tu factura promedio?</h2>
+                        <div class="options-grid">
+                            <button class="option-btn" onclick="setConsumo('$100 - $200'); nextStep(3, 4)">$100 - $200</button>
+                            <button class="option-btn" onclick="setConsumo('$201 - $350'); nextStep(3, 4)">$201 - $350</button>
+                            <button class="option-btn" onclick="setConsumo('$351+'); nextStep(3, 4)">$351 o más</button>
+                        </div>
+                    </div>
+                    <!-- STEP 4 -->
+                    <div class="step" id="step-4">
+                        <h2 class="title">¿De qué material es tu <span class="highlight">techo</span>?</h2>
+                        <div class="options-grid">
+                            <button class="option-btn" onclick="setField('roofType', 'Concreto'); nextStep(4, 5)">🏠 CONCRETO</button>
+                            <button class="option-btn" onclick="setField('roofType', 'Zinc/Metal'); nextStep(4, 5)">🥈 ZINC / METAL</button>
+                        </div>
+                    </div>
+                    <!-- STEP 5 -->
+                    <div class="step" id="step-5">
+                        <h2 class="title">¿Calificación de <span class="highlight">crédito</span>?</h2>
+                        <div class="options-grid">
+                            <button class="option-btn" onclick="setField('credit', '750+'); nextStep(5, 6)">🌟 EXCELENTE (750+)</button>
+                            <button class="option-btn" onclick="setField('credit', '651-749'); nextStep(5, 6)">☀️ BUENO (651 - 749)</button>
+                            <button class="option-btn" onclick="setField('credit', 'Menos de 650'); nextStep(5, 6)">❄️ REGULAR / AFECTADO (&lt;650)</button>
+                        </div>
+                    </div>
+                    <!-- STEP 6 -->
+                    <div class="step" id="step-6">
+                        <h2 class="title">¿Te interesa respaldo de <span class="highlight">batería</span>?</h2>
+                        <div class="options-grid">
+                            <button class="option-btn" onclick="setField('battery', 'Sí'); nextStep(6, 7)">🔋 SÍ, ME INTERESA</button>
+                            <button class="option-btn" onclick="setField('battery', 'No'); nextStep(6, 7)">💡 SOLO PLACAS</button>
+                        </div>
+                    </div>
+                    <!-- FINAL STEP -->
+                    <div class="step" id="step-7">
+                        <h2 class="title">¡Casi listo! <span class="highlight">Dinos quién eres</span></h2>
+                        <div class="input-group">
+                            <input type="text" id="full-name" placeholder="Nombre y Apellido" class="input-text">
+                            <input type="tel" id="phone" placeholder="Teléfono" class="input-text">
+                            <input type="email" id="email" placeholder="Correo Electrónico" class="input-text">
+                            <input type="text" id="address" placeholder="Dirección física de la propiedad" class="input-text">
+                            <input type="text" id="municipio" placeholder="Municipio donde resides" class="input-text">
+                            <button class="btn btn-primary" id="submit-btn">Obtener Mi Análisis Gratis</button>
+                        </div>
+                    </div>
+
+                    <div class="step" id="step-success">
+                        <div class="success-icon">✅</div>
+                        <h2 class="title">¡Mensaje Recibido!</h2>
+                        <p class="subtitle">Julio Varela Martinez se comunicará contigo pronto.</p>
+                        <button class="btn btn-secondary" onclick="location.reload()">Volver</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+    <script>
+        const images = ['/ads/fb_1.png', '/ads/fb_2.png', '/ads/fb_3.png'];
+        const randomImg = images[Math.floor(Math.random() * images.length)];
+        document.getElementById('dynamic-bg').style.backgroundImage = `url('${randomImg}')`;
+    </script>
+    <script type="module" src="/src/main.js"></script>
+</body>
+</html>
