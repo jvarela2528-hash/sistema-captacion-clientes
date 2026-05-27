@@ -31,6 +31,31 @@ function getOpenAI() {
     return openai;
 }
 
+let genAI;
+function getGenAI() {
+    if (!genAI) {
+        const { GoogleGenerativeAI } = require("@google/generative-ai");
+        genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    }
+    return genAI;
+}
+
+async function callGeminiText(prompt, systemInstruction = null, isJson = false) {
+    const ai = getGenAI();
+    const modelOptions = { model: "gemini-2.5-flash" };
+    if (systemInstruction) {
+        modelOptions.systemInstruction = systemInstruction;
+    }
+    if (isJson) {
+        modelOptions.generationConfig = {
+            responseMimeType: "application/json"
+        };
+    }
+    const model = ai.getGenerativeModel(modelOptions);
+    const result = await model.generateContent(prompt);
+    return result.response.text();
+}
+
 const TWILIO_WHATSAPP_NUMBER = "whatsapp:+14155238886"; 
 const TWILIO_SMS_NUMBER = "+12182766940"; 
 
@@ -100,7 +125,7 @@ ${lead.battery ? `🔋 Batería: ${lead.battery}` : ''}
 
 // ====== NUEVO: GENERACIÓN DE IA CON CONTROL DE COSTOS ======
 exports.generateAIAsset = onCall({ timeoutSeconds: 120 }, async (request) => {
-    const { prompt, type, clientId } = request.data;
+    const { prompt, type, clientId, model } = request.data;
     
     if (!prompt) return { error: "No prompt provided" };
 
@@ -122,10 +147,10 @@ exports.generateAIAsset = onCall({ timeoutSeconds: 120 }, async (request) => {
 
         let result = "";
         let cost = 0;
-        const ai = getOpenAI();
 
         if (type === "image") {
             console.log(`🎨 Generando imagen con DALL-E-3 para el prompt: ${prompt}`);
+            const ai = getOpenAI();
             const response = await ai.images.generate({
                 model: "dall-e-3",
                 prompt: `Anuncio publicitario profesional y premium de energía solar en Puerto Rico. Tema: ${prompt}. Estilo: Fotografía realista de alta gama, iluminación cinematográfica, colores vibrantes y modernos. Sin texto en la imagen.`,
@@ -149,17 +174,61 @@ exports.generateAIAsset = onCall({ timeoutSeconds: 120 }, async (request) => {
             }
             cost = 0.04;
         } else {
-            console.log(`✍️ Generando texto limpio con GPT-4o-mini para: ${prompt}`);
-            const response = await ai.chat.completions.create({
-                model: "gpt-4o-mini",
-                messages: [
-                    { role: "system", content: "Eres un experto en redactar anuncios virales. Tu tarea es entregar el texto del anuncio LISTO PARA PEGAR. NO incluyas etiquetas como 'Hook:', 'Texto corto:', ni introducciones. Solo el texto persuasivo con emojis. Al final incluye un llamado a la acción con el enlace proporcionado." },
-                    { role: "user", content: `Redacta un anuncio irresistible para energía solar en Puerto Rico basado en: ${prompt}. Empieza con un hook potente y sigue con el cuerpo del mensaje. Al final pon: 👉 Cotiza gratis aquí: https://solar-leads-juliovmartinez.web.app/` }
-                ],
-            });
-            console.log("✅ Respuesta de OpenAI (Texto):", response.choices[0].message.content);
-            result = response.choices[0].message.content;
-            cost = 0.0005; 
+            const systemInstruction = "Eres un experto en redactar anuncios virales. Tu tarea es entregar el texto del anuncio LISTO PARA PEGAR. NO incluyas etiquetas como 'Hook:', 'Texto corto:', ni introducciones. Solo el texto persuasivo con emojis. Al final incluye un llamado a la acción con el enlace proporcionado.";
+            const userPrompt = `Redacta un anuncio irresistible para energía solar en Puerto Rico basado en: ${prompt}. Empieza con un hook potente y sigue con el cuerpo del mensaje. Al final pon: 👉 Cotiza gratis aquí: https://solar-leads-juliovmartinez.web.app/`;
+
+            if (model === "gpt") {
+                console.log(`✍️ Generando texto limpio con GPT-4o-mini para: ${prompt}`);
+                try {
+                    const ai = getOpenAI();
+                    const response = await ai.chat.completions.create({
+                        model: "gpt-4o-mini",
+                        messages: [
+                            { role: "system", content: systemInstruction },
+                            { role: "user", content: userPrompt }
+                        ],
+                    });
+                    console.log("✅ Respuesta de OpenAI (Texto):", response.choices[0].message.content);
+                    result = response.choices[0].message.content;
+                    cost = 0.0005;
+                } catch (openaiError) {
+                    console.warn("⚠️ OpenAI falló. Intentando con Gemini como fallback...", openaiError);
+                    try {
+                        result = await callGeminiText(userPrompt, systemInstruction);
+                        console.log("✅ Respuesta de Gemini (Fallback):", result);
+                        cost = 0.00005;
+                    } catch (geminiError) {
+                        console.error("❌ Fallaron tanto OpenAI como Gemini:", geminiError);
+                        throw openaiError;
+                    }
+                }
+            } else {
+                // Gemini por defecto
+                console.log(`✍️ Generando texto limpio con Gemini-2.5-flash para: ${prompt}`);
+                try {
+                    result = await callGeminiText(userPrompt, systemInstruction);
+                    console.log("✅ Respuesta de Gemini (Texto):", result);
+                    cost = 0.00005;
+                } catch (geminiError) {
+                    console.warn("⚠️ Gemini falló. Intentando con OpenAI como fallback...", geminiError);
+                    try {
+                        const ai = getOpenAI();
+                        const response = await ai.chat.completions.create({
+                            model: "gpt-4o-mini",
+                            messages: [
+                                { role: "system", content: systemInstruction },
+                                { role: "user", content: userPrompt }
+                            ],
+                        });
+                        console.log("✅ Respuesta de OpenAI (Fallback):", response.choices[0].message.content);
+                        result = response.choices[0].message.content;
+                        cost = 0.0005;
+                    } catch (openaiError) {
+                        console.error("❌ Fallaron tanto Gemini como OpenAI:", openaiError);
+                        throw geminiError;
+                    }
+                }
+            }
         }
 
         // 2. Actualizar consumo
@@ -240,11 +309,10 @@ exports.extractLeadsFromImage = onCall({ timeoutSeconds: 120 }, async (request) 
 
 // ====== IA ASISTENTE DE COMUNICACIÓN ======
 exports.generateLeadMessage = onCall({ timeoutSeconds: 60 }, async (request) => {
-    const { lead, objective, tone } = request.data;
+    const { lead, objective, tone, model } = request.data;
     if (!lead) return { error: "Datos del prospecto incompletos." };
 
     try {
-        const ai = getOpenAI();
         const promptText = `Actúa como un asesor de ventas premium experto (Julio Varela / TuPlanta.com). Redacta un mensaje directo de comunicación para el siguiente prospecto:
 
 Datos del Prospecto:
@@ -264,14 +332,51 @@ REGLAS DE ORO (CRÍTICO PARA NO SONAR COMO ROBOT):
 4. Firma de forma profesional y amigable: "Julio Varela - Asesor Solar Premium (TuPlanta.com)".
 5. Nunca incluyas corchetes ni placeholders [como este], todo debe estar listo para copiar y enviar.`;
 
-        const response = await ai.chat.completions.create({
-            model: "gpt-4o-mini",
-            messages: [{ role: "user", content: promptText }],
-            max_tokens: 500,
-            temperature: 0.7
-        });
+        let message = "";
 
-        return { message: response.choices[0].message.content };
+        if (model === "gpt") {
+            console.log("✍️ Generando mensaje de lead con GPT-4o-mini...");
+            try {
+                const ai = getOpenAI();
+                const response = await ai.chat.completions.create({
+                    model: "gpt-4o-mini",
+                    messages: [{ role: "user", content: promptText }],
+                    max_tokens: 500,
+                    temperature: 0.7
+                });
+                message = response.choices[0].message.content;
+            } catch (openaiError) {
+                console.warn("⚠️ OpenAI falló al generar mensaje. Intentando con Gemini como fallback...", openaiError);
+                try {
+                    message = await callGeminiText(promptText);
+                } catch (geminiError) {
+                    console.error("❌ Fallaron tanto OpenAI como Gemini:", geminiError);
+                    throw openaiError;
+                }
+            }
+        } else {
+            console.log("✍️ Generando mensaje de lead con Gemini-2.5-flash...");
+            try {
+                message = await callGeminiText(promptText);
+            } catch (geminiError) {
+                console.warn("⚠️ Gemini falló al generar mensaje. Intentando con OpenAI como fallback...", geminiError);
+                try {
+                    const ai = getOpenAI();
+                    const response = await ai.chat.completions.create({
+                        model: "gpt-4o-mini",
+                        messages: [{ role: "user", content: promptText }],
+                        max_tokens: 500,
+                        temperature: 0.7
+                    });
+                    message = response.choices[0].message.content;
+                } catch (openaiError) {
+                    console.error("❌ Fallaron tanto Gemini como OpenAI:", openaiError);
+                    throw geminiError;
+                }
+            }
+        }
+
+        return { message };
     } catch (error) {
         console.error("❌ AI Comm Error:", error);
         return { error: `Error al generar mensaje: ${error.message}` };

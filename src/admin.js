@@ -394,6 +394,9 @@ function setupAICommModal() {
         if (!currentAICommLead) return;
         const objective = document.getElementById('ai-comm-objective')?.value || '';
         const tone = document.getElementById('ai-comm-tone')?.value || '';
+        const modelSelect = document.getElementById('ai-comm-model');
+        const selectedModel = modelSelect ? modelSelect.value : 'gemini';
+
         const statusBox = document.getElementById('ai-comm-status');
         const resultBox = document.getElementById('ai-comm-result-box');
         const textarea = document.getElementById('ai-comm-message-text');
@@ -405,7 +408,7 @@ function setupAICommModal() {
 
         try {
             const generateMsgFn = httpsCallable(functions, 'generateLeadMessage');
-            const res = await generateMsgFn({ lead: currentAICommLead, objective, tone });
+            const res = await generateMsgFn({ lead: currentAICommLead, objective, tone, model: selectedModel });
             
             if (res.data?.error) {
                 alert(`Error: ${res.data.error}`);
@@ -737,9 +740,12 @@ async function useAI(type, prompt, platform) {
     }
 
     try {
+        const modelSelect = document.getElementById('ai-model-select');
+        const selectedModel = modelSelect ? modelSelect.value : 'gemini';
+
         const generateAI = httpsCallable(functions, 'generateAIAsset');
-        console.log(`📡 Llamando a IA (${type}) con prompt: "${prompt}"...`);
-        const res = await generateAI({ prompt, type, clientId: currentClient.id });
+        console.log(`📡 Llamando a IA (${type}) con prompt: "${prompt}" usando modelo: ${selectedModel}...`);
+        const res = await generateAI({ prompt, type, clientId: currentClient.id, model: selectedModel });
         console.log(`🤖 IA Response (${type}):`, res.data);
         
         if (res.data.error) {

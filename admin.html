@@ -570,9 +570,18 @@
                     </div>
                 </header>
 
-                <div class="branding-input-box" style="margin-bottom:0.4rem;">
-                    <span style="font-size:0.75rem; font-weight:700; color:var(--primary);">🖋️ BRANDING:</span>
-                    <input type="text" id="branding-name" placeholder="Ej: Julio Varela" value="Julio Varela">
+                <div class="branding-input-box" style="margin-bottom:0.4rem; display: flex; flex-wrap: wrap; gap: 1rem; align-items: center;">
+                    <div style="flex: 1; display: flex; align-items: center; gap: 0.5rem; min-width: 250px;">
+                        <span style="font-size:0.75rem; font-weight:700; color:var(--primary); white-space: nowrap;">🖋️ BRANDING:</span>
+                        <input type="text" id="branding-name" placeholder="Ej: Julio Varela" value="Julio Varela">
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 0.5rem; min-width: 200px;">
+                        <span style="font-size:0.75rem; font-weight:700; color:var(--primary); white-space: nowrap;">🤖 MODELO IA:</span>
+                        <select id="ai-model-select" class="status-select" style="padding: 6px 12px; font-size: 0.8rem; font-weight: 700; border-color: #d4af37; background: #000; color: #fff; border-radius: 6px; cursor: pointer;">
+                            <option value="gemini" selected>✨ Gemini 2.5 Flash</option>
+                            <option value="gpt">🧠 GPT-4o Mini (OpenAI)</option>
+                        </select>
+                    </div>
                 </div>
 
                 <div class="marketing-grid">
@@ -730,22 +739,29 @@
             </div>
 
             <!-- Parámetros de Generación -->
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.5rem; background:#181818; padding:1.2rem; border-radius:16px; border:1px solid #252525;">
+            <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:1.2rem; margin-bottom:1.5rem; background:#181818; padding:1.2rem; border-radius:16px; border:1px solid #252525;">
                 <div>
                     <label style="display:block; font-size:0.8rem; font-weight:700; color:#aaa; margin-bottom:0.5rem; text-transform:uppercase;">🎯 Objetivo del Mensaje</label>
                     <select id="ai-comm-objective" style="width:100%; background:#0a0a0a; color:#fff; border:1px solid #333; padding:0.8rem; border-radius:10px; font-size:0.9rem; cursor:pointer;">
-                        <option value="🤝 Contacto Inicial y Presentación Empática">🤝 Contacto Inicial (Presentación Empática)</option>
-                        <option value="📅 Agendar Cita de Orientación Breve">📅 Agendar Cita de Orientación</option>
-                        <option value="❓ Seguimiento y Atención de Dudas">❓ Seguimiento / Atención de Dudas</option>
-                        <option value="💰 Oferta Especial VIP / Beneficios">💰 Oferta Especial VIP / Beneficios</option>
+                        <option value="🤝 Contacto Inicial y Presentación Empática">🤝 Contacto Inicial</option>
+                        <option value="📅 Agendar Cita de Orientación Breve">📅 Agendar Cita</option>
+                        <option value="❓ Seguimiento y Atención de Dudas">❓ Seguimiento</option>
+                        <option value="💰 Oferta Especial VIP / Beneficios">💰 Oferta Especial</option>
                     </select>
                 </div>
                 <div>
                     <label style="display:block; font-size:0.8rem; font-weight:700; color:#aaa; margin-bottom:0.5rem; text-transform:uppercase;">🎭 Tono del Mensaje</label>
                     <select id="ai-comm-tone" style="width:100%; background:#0a0a0a; color:#fff; border:1px solid #333; padding:0.8rem; border-radius:10px; font-size:0.9rem; cursor:pointer;">
-                        <option value="👤 Profesional, Humano y Cercano (Cero robótico)">👤 Profesional y Humano (Recomendado)</option>
-                        <option value="👔 Formal, Estructurado y Ejecutivo">👔 Formal y Ejecutivo</option>
-                        <option value="😊 Entusiasta, Enérgico y Muy Dinámico">😊 Entusiasta y Enérgico</option>
+                        <option value="👤 Profesional, Humano y Cercano (Cero robótico)">👤 Profesional y Humano</option>
+                        <option value="👔 Formal, Estructurado y Ejecutivo">👔 Formal</option>
+                        <option value="😊 Entusiasta, Enérgico y Muy Dinámico">😊 Entusiasta</option>
+                    </select>
+                </div>
+                <div>
+                    <label style="display:block; font-size:0.8rem; font-weight:700; color:#aaa; margin-bottom:0.5rem; text-transform:uppercase;">🤖 Cerebro IA</label>
+                    <select id="ai-comm-model" style="width:100%; background:#0a0a0a; color:#fff; border:1px solid #333; padding:0.8rem; border-radius:10px; font-size:0.9rem; cursor:pointer;">
+                        <option value="gemini" selected>✨ Gemini 2.5</option>
+                        <option value="gpt">🧠 GPT-4o Mini</option>
                     </select>
                 </div>
             </div>
