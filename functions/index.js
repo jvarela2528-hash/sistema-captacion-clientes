@@ -82,44 +82,36 @@ exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
 
     console.log(`🚀 [SISTEMA] Nuevo lead para ${headerName} (ID: ${leadId})`);
 
-    const messageBody = `
-🏢 ${headerName}
-🔥 ¡NUEVO LEAD RECIBIDO!
--------------------------
-👤 Nombre: ${lead.name}
-📞 Tel: ${lead.phone}
-📍 Pueblo: ${lead.municipio}
-🏢 Servicio: ${lead.service?.toUpperCase() || 'SOLAR'}
-${lead.consumo ? `💰 Factura: ${lead.consumo}` : ''}
-${lead.roofType ? `🏠 Techo: ${lead.roofType}` : ''}
-${lead.credit ? `💳 Crédito: ${lead.credit}` : ''}
-${lead.battery ? `🔋 Batería: ${lead.battery}` : ''}
--------------------------
-⭐ Calidad: ${lead.scoreLabel || 'Normal'}
-🔗 CRM: https://solar-leads-juliovmartinez.web.app/admin.html
-    `.trim();
-
-    const twilio = getTwilio();
-
-    // Enviar a todos los destinatarios configurados
-    for (const phone of recipients) {
-        // 1. WhatsApp
-        try {
-            await twilio.messages.create({
-                body: messageBody,
-                from: TWILIO_WHATSAPP_NUMBER,
-                to: `whatsapp:${phone}`
-            });
-        } catch (e) { console.error(`Error WhatsApp (${phone}):`, e.message); }
-
-        // 2. SMS (Opcional: puedes comentarlo si solo quieres WhatsApp)
-        try {
-            await twilio.messages.create({
-                body: messageBody,
-                from: TWILIO_SMS_NUMBER,
-                to: phone
-            });
-        } catch (e) { console.error(`Error SMS (${phone}):`, e.message); }
+    const makeWebhookUrl = "https://hook.us2.make.com/g4lwws1zrh77x7vt44nf49rwuogjjrux";
+    try {
+        const payload = {
+            nombre: lead.name || "N/A",
+            telefono: lead.phone || "N/A",
+            pueblo: lead.municipio || "N/A",
+            servicio: lead.service || lead.product || "Solar",
+            factura: lead.consumo || "N/A",
+            techo: lead.roofType || "N/A",
+            credito: lead.credit || "N/A",
+            bateria: lead.battery || "N/A",
+            calificacion: lead.scoreLabel || "Normal"
+        };
+        
+        console.log(`📤 Enviando datos al webhook de Make para lead ${leadId}...`);
+        const response = await fetch(makeWebhookUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+        });
+        
+        if (response.ok) {
+            console.log(`✅ Webhook de Make notificado con éxito (Status: ${response.status})`);
+        } else {
+            console.error(`⚠️ Webhook de Make respondió con error (Status: ${response.status})`);
+        }
+    } catch (e) {
+        console.error("❌ Error al llamar al webhook de Make:", e.message);
     }
 });
 

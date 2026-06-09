@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "whatsapp-bridge": "node whatsapp-bridge.cjs"
   },
   "devDependencies": {
     "vite": "^8.0.10"
   },
   "dependencies": {
+    "express": "^5.2.1",
     "firebase": "^12.13.0",
-    "qrcode": "^1.5.4"
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.34.7"
   }
 }

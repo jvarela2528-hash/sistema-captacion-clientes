@@ -1,21 +1,47 @@
-# Logs
-logs
+# Secretos, Entornos y Credenciales (CRIT-02)
+.env
+*.env
+.env.*
+.env.local
+service-account.json
+*.json
+!package.json
+!package-lock.json
+!tsconfig.json
+!firebase.json
+!firestore.indexes.json
+
+# Sesiones de WhatsApp Web y Caches (HIGH-05)
+.wwebjs_auth/
+.wwebjs_cache/
+*_session.json
+user_data_chrome*/
+user_data_chrome_yo/
+
+# Logs de error y depuración masiva (HIGH-08)
 *.log
+logs/
+output.txt
+run.txt
+error.txt
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
-lerna-debug.log*
 
-node_modules
-dist
-dist-ssr
-*.local
+# Carpetas de Dependencias y Compilados de Producción
+node_modules/
+/node_modules
+functions/node_modules/
+dist/
+dist-ssr/
+build/
+.firebase/
 
-# Editor directories and files
-.vscode/*
+# Directorios de Editores e IDEs
+.vscode/
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*
