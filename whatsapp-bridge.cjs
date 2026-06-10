@@ -2,8 +2,14 @@ const { Client, LocalAuth } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const express = require('express');
 
+// Cargar variables de entorno locales si existen
+require('dotenv').config();
+
 const app = express();
 app.use(express.json());
+
+// Token de seguridad requerido (Mover a tu archivo .env local)
+const BRIDGE_SECRET = process.env.BRIDGE_SECRET || 'CambiarEsteTokenUrgente2026';
 
 // Middleware para registrar peticiones entrantes
 app.use((req, res, next) => {
@@ -11,9 +17,19 @@ app.use((req, res, next) => {
     next();
 });
 
-// Enlace de invitación del grupo de tu papá
+// Middleware de Autenticación del Puente (Mitigación HIGH-04)
+const verifyBridgeToken = (req, res, next) => {
+    const token = req.headers['x-bridge-secret'];
+    if (!token || token !== BRIDGE_SECRET) {
+        console.warn(`⚠️ [RECHAZADO] Intento de acceso no autorizado desde: ${req.ip}`);
+        return res.status(403).json({ success: false, error: 'Forbidden: Invalid or missing token.' });
+    }
+    next();
+};
+
+// Enlace de invitación del grupo
 const GRUPO_INVITE_LINK = 'https://chat.whatsapp.com/E8HqDkHqpCXDd4OcPhhpiR';
-let targetGroupId = null; // Se auto-resolverá al conectar
+let targetGroupId = null;
 
 // Inicializar cliente de WhatsApp con persistencia de sesión local
 const client = new Client({
@@ -62,8 +78,16 @@ client.on('ready', async () => {
     }
 });
 
-// Endpoint POST para recibir leads desde Make o tu CRM interno
-app.post('/api/send-message', async (req, res) => {
+// Manejo de desconexión para re-autenticación limpia
+client.on('disconnected', (reason) => {
+    console.warn('⚠️ Cliente de WhatsApp desconectado. Razón:', reason);
+    targetGroupId = null;
+    // Forzar reinicio del cliente si es necesario
+    client.initialize().catch(err => console.error('Error re-inicializando:', err.message));
+});
+
+// Endpoint POST blindado para recibir leads desde Make o tu CRM interno
+app.post('/api/send-message', verifyBridgeToken, async (req, res) => {
     const { mensaje } = req.body;
 
     if (!mensaje) {
@@ -76,12 +100,12 @@ app.post('/api/send-message', async (req, res) => {
     if (!targetGroupId) {
         return res.status(503).json({ 
             success: false, 
-            error: 'El puente de WhatsApp aún no ha resuelto el ID del grupo destino.' 
+            error: 'El puente de WhatsApp aún no ha resuelto el ID del grupo destino o el bot está desconectado.' 
         });
     }
 
     try {
-        // Enviar el lead directamente al grupo sin simular clicks ni pantallas
+        // Enviar el lead directamente al grupo de forma atómica
         await client.sendMessage(targetGroupId, mensaje);
         console.log(`✅ Lead enviado con éxito al grupo.`);
         return res.status(200).json({ 
@@ -98,10 +122,10 @@ app.post('/api/send-message', async (req, res) => {
 });
 
 // Inicializar el cliente de WhatsApp Web
-client.initialize();
+client.initialize().catch(err => console.error("❌ Error al arrancar WhatsApp:", err.message));
 
-// Servidor escuchando en el puerto 3001 según tu plan de verificación
+// Servidor escuchando en el puerto 3001
 const PORT = 3001;
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor API de WhatsApp escuchando en http://localhost:${PORT}`);
+    console.log(`🚀 Servidor API de WhatsApp protegido escuchando en http://localhost:${PORT}`);
 });
