@@ -5,6 +5,9 @@ const express = require('express');
 // Cargar variables de entorno locales si existen
 require('dotenv').config();
 
+// Garantizar directorio de caché de Puppeteer para Render
+process.env.PUPPETEER_CACHE_DIR = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
+
 // [HALLAZGO-BRIDGE-03] Manejadores globales para prevenir el colapso del proceso por errores de Puppeteer
 process.on('uncaughtException', (error) => {
     console.error('❌ Excepción no capturada (uncaughtException):', error.message || error);
