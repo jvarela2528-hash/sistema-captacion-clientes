@@ -54,14 +54,33 @@ let groupsMap = {
     angel: null
 };
 
+const fs = require('fs');
 const puppeteer = require('puppeteer');
 
-let puppeteerExecPath;
-try {
-    puppeteerExecPath = puppeteer.executablePath();
-    console.log('📌 Executable Chrome Path:', puppeteerExecPath);
-} catch (e) {
-    console.warn('⚠️ Could not resolve executablePath automatically:', e.message);
+process.env.PUPPETEER_CACHE_DIR = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
+
+let puppeteerExecPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+
+if (!puppeteerExecPath || !fs.existsSync(puppeteerExecPath)) {
+    try {
+        const defaultPath = puppeteer.executablePath();
+        if (fs.existsSync(defaultPath)) {
+            puppeteerExecPath = defaultPath;
+            console.log('📌 Executable Chrome Path (Puppeteer):', puppeteerExecPath);
+        }
+    } catch (e) {
+        console.warn('⚠️ Standard puppeteer executablePath not found:', e.message);
+    }
+}
+
+if (!puppeteerExecPath || !fs.existsSync(puppeteerExecPath)) {
+    try {
+        const chromium = require('@sparticuz/chromium');
+        puppeteerExecPath = chromium.executablePath();
+        console.log('📌 Executable Chrome Path (@sparticuz/chromium):', puppeteerExecPath);
+    } catch (e) {
+        console.warn('⚠️ @sparticuz/chromium fallback failed:', e.message);
+    }
 }
 
 // Inicializar cliente de WhatsApp con persistencia de sesión local

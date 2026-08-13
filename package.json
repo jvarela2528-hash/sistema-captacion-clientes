@@ -5,9 +5,9 @@
   "type": "module",
   "scripts": {
     "start": "node whatsapp-bridge.cjs",
-    "postinstall": "npx puppeteer browsers install chrome",
+    "postinstall": "PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer npx puppeteer browsers install chrome",
     "dev": "vite",
-    "build": "npx puppeteer browsers install chrome && vite build",
+    "build": "PUPPETEER_CACHE_DIR=/opt/render/.cache/puppeteer npx puppeteer browsers install chrome && vite build",
     "preview": "vite preview",
     "whatsapp-bridge": "node whatsapp-bridge.cjs"
   },
@@ -15,12 +15,14 @@
     "vite": "^8.0.10"
   },
   "dependencies": {
+    "@sparticuz/chromium": "^149.0.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "firebase": "^12.13.0",
+    "puppeteer": "^24.3.0",
+    "puppeteer-core": "^25.7.0",
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
-    "puppeteer": "^24.3.0",
     "whatsapp-web.js": "^1.34.7"
   }
 }
