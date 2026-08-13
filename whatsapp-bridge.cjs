@@ -101,6 +101,7 @@ const QRCode = require('qrcode');
 const path = require('path');
 let isReady = false;
 let isAuthenticating = false;
+let latestQRDataURL = null;
 
 // Ruta raíz pública que redirige directamente a /qr para GET
 app.get('/', (req, res) => {
@@ -296,7 +297,13 @@ app.listen(PORT, () => {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
-                '--disable-gpu'
+                '--disable-gpu',
+                '--disable-extensions',
+                '--disable-background-networking',
+                '--disable-sync',
+                '--disable-default-apps',
+                '--mute-audio',
+                '--js-flags="--max-old-space-size=256"'
             ]
         }
     });
