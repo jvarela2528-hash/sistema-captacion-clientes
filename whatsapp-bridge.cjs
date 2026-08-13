@@ -55,76 +55,51 @@ let groupsMap = {
 };
 
 const fs = require('fs');
-const puppeteer = require('puppeteer');
 
-process.env.PUPPETEER_CACHE_DIR = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
-
-let puppeteerExecPath = process.env.PUPPETEER_EXECUTABLE_PATH;
-
-if (!puppeteerExecPath || !fs.existsSync(puppeteerExecPath)) {
-    try {
-        const defaultPath = puppeteer.executablePath();
-        if (fs.existsSync(defaultPath)) {
-            puppeteerExecPath = defaultPath;
-            console.log('📌 Executable Chrome Path (Puppeteer):', puppeteerExecPath);
-        }
-    } catch (e) {
-        console.warn('⚠️ Standard puppeteer executablePath not found:', e.message);
+// Función async para resolver el ejecutable de Chrome
+async function resolveChromePath() {
+    // 1. Ruta explícita desde variable de entorno
+    const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    if (envPath && fs.existsSync(envPath)) {
+        console.log('📌 Chrome Path (ENV):', envPath);
+        return envPath;
     }
-}
 
-if (!puppeteerExecPath || !fs.existsSync(puppeteerExecPath)) {
+    // 2. @sparticuz/chromium — binario incluido, funciona en Render sin instalación extra
     try {
         const chromium = require('@sparticuz/chromium');
-        puppeteerExecPath = chromium.executablePath();
-        console.log('📌 Executable Chrome Path (@sparticuz/chromium):', puppeteerExecPath);
+        const chromiumPath = await chromium.executablePath();
+        if (chromiumPath && fs.existsSync(chromiumPath)) {
+            console.log('📌 Chrome Path (@sparticuz/chromium):', chromiumPath);
+            return chromiumPath;
+        }
     } catch (e) {
-        console.warn('⚠️ @sparticuz/chromium fallback failed:', e.message);
+        console.warn('⚠️ @sparticuz/chromium no disponible:', e.message);
     }
+
+    // 3. Fallback: puppeteer descargado localmente
+    try {
+        const puppeteer = require('puppeteer');
+        const defaultPath = puppeteer.executablePath();
+        if (defaultPath && fs.existsSync(defaultPath)) {
+            console.log('📌 Chrome Path (puppeteer local):', defaultPath);
+            return defaultPath;
+        }
+    } catch (e) {
+        console.warn('⚠️ puppeteer.executablePath() no disponible:', e.message);
+    }
+
+    console.warn('⚠️ No se encontró ningún ejecutable de Chrome. Se usará el predeterminado del sistema.');
+    return undefined;
 }
 
-// Inicializar cliente de WhatsApp con persistencia de sesión local
-const client = new Client({
-    authStrategy: new LocalAuth({
-        clientId: "antigravity-crm-bridge"
-    }),
-    puppeteer: {
-        executablePath: puppeteerExecPath || undefined,
-        handleSIGINT: false,
-        args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-accelerated-2d-canvas',
-            '--no-first-run',
-            '--no-zygote',
-            '--disable-gpu'
-        ]
-    }
-});
+// El cliente se inicializa dentro de una función async para poder usar await en resolveChromePath()
+let client;
 
 const QRCode = require('qrcode');
 const path = require('path');
 let isReady = false;
 let isAuthenticating = false;
-
-// Escuchar y guardar el código QR como imagen y en memoria
-client.on('qr', async (qr) => {
-    isReady = false;
-    console.clear();
-    qrcode.generate(qr, { small: true });
-    console.log('\n==================================================');
-    console.log(' Escanea este código QR con el WhatsApp del Bot');
-    console.log('==================================================\n');
-
-    try {
-        latestQRDataURL = await QRCode.toDataURL(qr);
-        await QRCode.toFile(path.join(__dirname, 'qr.png'), qr);
-        console.log('📸 Código QR guardado como "qr.png" y disponible en http://localhost:3001/qr');
-    } catch (err) {
-        console.error('Error guardando imagen QR:', err.message);
-    }
-});
 
 // Ruta raíz pública que redirige directamente a /qr para GET
 app.get('/', (req, res) => {
@@ -256,54 +231,6 @@ async function resolveGroupLink(link) {
     }
 }
 
-// Al estar listo, resolver grupos
-client.on('ready', async () => {
-    isReady = true;
-    console.clear();
-    console.log('==================================================');
-    console.log(' ¡Puente de WhatsApp EN LÍNEA y listo! ');
-    console.log('==================================================\n');
-
-    // 1. Escanear chats existentes para detectar grupos por nombre
-    try {
-        const chats = await client.getChats();
-        const groups = chats.filter(c => c.isGroup);
-        console.log(`📋 Grupos detectados en WhatsApp (${groups.length}):`);
-        groups.forEach(g => {
-            console.log(` - Group: "${g.name}" | ID: ${g.id._serialized}`);
-            const nameLower = g.name.toLowerCase();
-            if (nameLower.includes('angel') || nameLower.includes('curbelo')) {
-                groupsMap.angel = g.id._serialized;
-                console.log(`   👉 Asignado a proyecto ANGEL`);
-            } else if (nameLower.includes('julio') || nameLower.includes('captacion') || nameLower.includes('solar')) {
-                groupsMap.julio = g.id._serialized;
-                console.log(`   👉 Asignado a proyecto JULIO`);
-            }
-        });
-    } catch (e) {
-        console.error('Error escaneando grupos:', e.message);
-    }
-
-    // 2. Resolver por enlaces si aún no están asignados
-    if (!groupsMap.julio && GRUPO_JULIO_LINK) {
-        groupsMap.julio = await resolveGroupLink(GRUPO_JULIO_LINK);
-    }
-    if (!groupsMap.angel && GRUPO_ANGEL_LINK) {
-        groupsMap.angel = await resolveGroupLink(GRUPO_ANGEL_LINK);
-    }
-
-    console.log('\n📌 Mapeo final de Grupos:');
-    console.log(' - Julio / Captación:', groupsMap.julio || 'Pendiente de enlace/nombre');
-    console.log(' - Angel Curbelo:', groupsMap.angel || 'Pendiente de enlace/nombre\n');
-});
-
-// Manejo de desconexión
-client.on('disconnected', (reason) => {
-    console.warn('⚠️ Cliente de WhatsApp desconectado. Razón:', reason);
-    groupsMap = { julio: null, angel: null };
-    client.initialize().catch(err => console.error('Error re-inicializando:', err.message));
-});
-
 // Endpoint POST blindado para recibir leads desde Make o CRM
 app.post('/api/send-message', verifyBridgeToken, async (req, res) => {
     const { mensaje, clientId } = req.body;
@@ -344,11 +271,82 @@ app.post('/api/send-message', verifyBridgeToken, async (req, res) => {
     }
 });
 
-// Inicializar el cliente de WhatsApp Web
-client.initialize().catch(err => console.error("❌ Error al arrancar WhatsApp:", err.message));
-
 // Servidor escuchando en el puerto dinámico de Render (process.env.PORT) o 3001 por defecto localmente
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
     console.log(`🚀 Servidor API de WhatsApp protegido escuchando en el puerto ${PORT}`);
 });
+
+// Inicializar cliente de WhatsApp de forma async para resolver Chrome correctamente
+(async () => {
+    const executablePath = await resolveChromePath();
+
+    client = new Client({
+        authStrategy: new LocalAuth({
+            clientId: "antigravity-crm-bridge"
+        }),
+        puppeteer: {
+            executablePath: executablePath || undefined,
+            handleSIGINT: false,
+            args: [
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-dev-shm-usage',
+                '--disable-accelerated-2d-canvas',
+                '--no-first-run',
+                '--no-zygote',
+                '--disable-gpu'
+            ]
+        }
+    });
+
+    // Re-registrar eventos en el nuevo cliente
+    client.on('qr', async (qr) => {
+        isReady = false;
+        qrcode.generate(qr, { small: true });
+        console.log('\n==================================================');
+        console.log(' Escanea este código QR con el WhatsApp del Bot');
+        console.log('==================================================\n');
+        try {
+            latestQRDataURL = await QRCode.toDataURL(qr);
+            await QRCode.toFile(path.join(__dirname, 'qr.png'), qr);
+            console.log('📸 QR guardado como qr.png y disponible en /qr');
+        } catch (err) {
+            console.error('Error guardando QR:', err.message);
+        }
+    });
+
+    client.on('ready', async () => {
+        isReady = true;
+        console.log('==================================================');
+        console.log(' ¡Puente de WhatsApp EN LÍNEA y listo! ');
+        console.log('==================================================\n');
+        try {
+            const chats = await client.getChats();
+            const groups = chats.filter(c => c.isGroup);
+            console.log(`📋 Grupos detectados (${groups.length}):`);
+            groups.forEach(g => {
+                console.log(` - "${g.name}" | ID: ${g.id._serialized}`);
+                const nameLower = g.name.toLowerCase();
+                if (nameLower.includes('angel') || nameLower.includes('curbelo')) {
+                    groupsMap.angel = g.id._serialized;
+                } else if (nameLower.includes('julio') || nameLower.includes('captacion') || nameLower.includes('solar')) {
+                    groupsMap.julio = g.id._serialized;
+                }
+            });
+        } catch (e) {
+            console.error('Error escaneando grupos:', e.message);
+        }
+        if (!groupsMap.julio && GRUPO_JULIO_LINK) groupsMap.julio = await resolveGroupLink(GRUPO_JULIO_LINK);
+        if (!groupsMap.angel && GRUPO_ANGEL_LINK) groupsMap.angel = await resolveGroupLink(GRUPO_ANGEL_LINK);
+        console.log('\n📌 Grupos:', groupsMap);
+    });
+
+    client.on('disconnected', (reason) => {
+        console.warn('⚠️ WhatsApp desconectado. Razón:', reason);
+        groupsMap = { julio: null, angel: null };
+        isReady = false;
+    });
+
+    client.initialize().catch(err => console.error('❌ Error al arrancar WhatsApp:', err.message));
+})();
