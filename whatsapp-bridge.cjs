@@ -91,6 +91,11 @@ client.on('qr', async (qr) => {
     }
 });
 
+// Ruta raíz pública que redirige directamente a /qr
+app.get('/', (req, res) => {
+    res.redirect('/qr');
+});
+
 // Endpoint público para ver el QR directamente en el navegador
 app.get('/qr', (req, res) => {
     if (!latestQRDataURL) {
@@ -229,8 +234,8 @@ app.post('/api/send-message', verifyBridgeToken, async (req, res) => {
 // Inicializar el cliente de WhatsApp Web
 client.initialize().catch(err => console.error("❌ Error al arrancar WhatsApp:", err.message));
 
-// Servidor escuchando en el puerto 3001
-const PORT = 3001;
+// Servidor escuchando en el puerto dinámico de Render (process.env.PORT) o 3001 por defecto localmente
+const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
-    console.log(`🚀 Servidor API de WhatsApp protegido escuchando en http://localhost:${PORT}`);
+    console.log(`🚀 Servidor API de WhatsApp protegido escuchando en el puerto ${PORT}`);
 });
