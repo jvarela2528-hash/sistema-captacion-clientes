@@ -54,12 +54,23 @@ let groupsMap = {
     angel: null
 };
 
+const puppeteer = require('puppeteer');
+
+let puppeteerExecPath;
+try {
+    puppeteerExecPath = puppeteer.executablePath();
+    console.log('📌 Executable Chrome Path:', puppeteerExecPath);
+} catch (e) {
+    console.warn('⚠️ Could not resolve executablePath automatically:', e.message);
+}
+
 // Inicializar cliente de WhatsApp con persistencia de sesión local
 const client = new Client({
     authStrategy: new LocalAuth({
         clientId: "antigravity-crm-bridge"
     }),
     puppeteer: {
+        executablePath: puppeteerExecPath || undefined,
         handleSIGINT: false,
         args: [
             '--no-sandbox',
