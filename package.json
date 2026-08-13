@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "node whatsapp-bridge.cjs",
+    "postinstall": "npx puppeteer browsers install chrome",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
