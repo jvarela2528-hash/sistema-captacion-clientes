@@ -5,8 +5,10 @@ const express = require('express');
 // Cargar variables de entorno locales si existen
 require('dotenv').config();
 
-// Garantizar directorio de caché de Puppeteer para Render
-process.env.PUPPETEER_CACHE_DIR = process.env.PUPPETEER_CACHE_DIR || '/opt/render/.cache/puppeteer';
+// Garantizar directorio de caché de Puppeteer — debe coincidir con el buildCommand en render.yaml
+if (!process.env.PUPPETEER_CACHE_DIR) {
+    process.env.PUPPETEER_CACHE_DIR = '/opt/render/project/src/.puppeteer-cache';
+}
 
 // [HALLAZGO-BRIDGE-03] Manejadores globales para prevenir el colapso del proceso por errores de Puppeteer
 process.on('uncaughtException', (error) => {
@@ -55,46 +57,45 @@ let groupsMap = {
 };
 
 const fs = require('fs');
+const puppeteer = require('puppeteer');
 
 // Función async para resolver el ejecutable de Chrome
 async function resolveChromePath() {
     // 1. Ruta explícita desde variable de entorno
     const envPath = process.env.PUPPETEER_EXECUTABLE_PATH;
     if (envPath && fs.existsSync(envPath)) {
-        console.log('📌 Chrome Path (ENV):', envPath);
+        console.log('📌 Chrome vía ENV:', envPath);
         return envPath;
     }
 
-    // 2. @sparticuz/chromium — binario incluido, funciona en Render sin instalación extra
+    // 2. puppeteer.executablePath() — respeta PUPPETEER_CACHE_DIR (instalado en build de Render)
+    try {
+        const chromePath = puppeteer.executablePath();
+        if (chromePath && fs.existsSync(chromePath)) {
+            console.log('📌 Chrome vía puppeteer.executablePath():', chromePath);
+            return chromePath;
+        } else {
+            console.warn('⚠️ puppeteer.executablePath() no existe en disco:', chromePath);
+        }
+    } catch (e) {
+        console.warn('⚠️ puppeteer.executablePath() error:', e.message);
+    }
+
+    // 3. @sparticuz/chromium — fallback para entornos serverless
     try {
         const chromium = require('@sparticuz/chromium');
         const chromiumPath = await chromium.executablePath();
         if (chromiumPath && fs.existsSync(chromiumPath)) {
-            console.log('📌 Chrome Path (@sparticuz/chromium):', chromiumPath);
+            console.log('📌 Chrome vía @sparticuz/chromium:', chromiumPath);
             return chromiumPath;
         }
     } catch (e) {
         console.warn('⚠️ @sparticuz/chromium no disponible:', e.message);
     }
 
-    // 3. Fallback: puppeteer descargado localmente
-    try {
-        const puppeteer = require('puppeteer');
-        const defaultPath = puppeteer.executablePath();
-        if (defaultPath && fs.existsSync(defaultPath)) {
-            console.log('📌 Chrome Path (puppeteer local):', defaultPath);
-            return defaultPath;
-        }
-    } catch (e) {
-        console.warn('⚠️ puppeteer.executablePath() no disponible:', e.message);
-    }
-
-    console.warn('⚠️ No se encontró ningún ejecutable de Chrome. Se usará el predeterminado del sistema.');
+    console.warn('⚠️ Sin Chrome explícito — Puppeteer intentará usar el predeterminado del sistema.');
     return undefined;
 }
-
-// El cliente se inicializa dentro de una función async para poder usar await en resolveChromePath()
-let client;
 
 const QRCode = require('qrcode');
 const path = require('path');

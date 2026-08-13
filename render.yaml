@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: sistema-captacion-clientes
+    env: node
+    plan: free
+    buildCommand: npm install && PUPPETEER_CACHE_DIR=/opt/render/project/src/.puppeteer-cache npx puppeteer browsers install chrome
+    startCommand: node whatsapp-bridge.cjs
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PUPPETEER_CACHE_DIR
+        value: /opt/render/project/src/.puppeteer-cache
