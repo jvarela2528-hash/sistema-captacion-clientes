@@ -285,10 +285,16 @@ app.listen(PORT, () => {
 
     client = new Client({
         authStrategy: new LocalAuth({
-            clientId: "antigravity-crm-bridge"
+            clientId: "antigravity-crm-bridge",
+            dataPath: "/opt/render/project/src/.wwebjs_auth"
         }),
+        webVersionCache: {
+            type: 'remote',
+            remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-js/main/dist/wppconnect-wa.js'
+        },
         puppeteer: {
             executablePath: executablePath || undefined,
+            headless: true,
             handleSIGINT: false,
             args: [
                 '--no-sandbox',
@@ -297,13 +303,15 @@ app.listen(PORT, () => {
                 '--disable-accelerated-2d-canvas',
                 '--no-first-run',
                 '--no-zygote',
+                '--single-process',
                 '--disable-gpu',
                 '--disable-extensions',
                 '--disable-background-networking',
                 '--disable-sync',
                 '--disable-default-apps',
                 '--mute-audio',
-                '--js-flags="--max-old-space-size=256"'
+                '--disable-features=site-per-process,TranslateUI,BlinkGenPropertyTrees',
+                '--js-flags="--max-old-space-size=180"'
             ]
         }
     });
