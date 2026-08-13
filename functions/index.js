@@ -93,6 +93,7 @@ exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
         const payload = {
             nombre: lead.name || "N/A",
             telefono: lead.phone || "N/A",
+            email: lead.email || "N/A",
             pueblo: lead.municipio || "N/A",
             servicio: lead.service || lead.product || "Solar",
             factura: lead.consumo || "N/A",

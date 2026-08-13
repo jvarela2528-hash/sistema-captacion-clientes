@@ -72,10 +72,12 @@ const client = new Client({
 
 const QRCode = require('qrcode');
 const path = require('path');
-let latestQRDataURL = null;
+let isReady = false;
+let isAuthenticating = false;
 
 // Escuchar y guardar el código QR como imagen y en memoria
 client.on('qr', async (qr) => {
+    isReady = false;
     console.clear();
     qrcode.generate(qr, { small: true });
     console.log('\n==================================================');
@@ -91,16 +93,93 @@ client.on('qr', async (qr) => {
     }
 });
 
-// Ruta raíz pública que redirige directamente a /qr
+// Ruta raíz pública que redirige directamente a /qr para GET
 app.get('/', (req, res) => {
     res.redirect('/qr');
 });
 
-// Endpoint público para ver el QR directamente en el navegador
+// Manejador para POST a la raíz (orientación de URL correcta)
+app.post('/', (req, res) => {
+    res.status(404).json({
+        success: false,
+        error: 'Ruta no encontrada. La URL completa del webhook debe terminar en /api/send-message',
+        exampleUrl: `${req.protocol}://${req.get('host')}/api/send-message`
+    });
+});
+
+// Endpoint público para ver el QR o Estado del Bot en el navegador
 app.get('/qr', (req, res) => {
-    if (!latestQRDataURL) {
-        return res.send('<h2>El puente de WhatsApp ya está autenticado o cargando el código QR... Refresca en unos segundos.</h2>');
+    if (isReady) {
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Estado WhatsApp Bot</title>
+                <meta http-equiv="refresh" content="30">
+                <style>
+                    body { font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; background: #0f172a; color: white; margin: 0; padding: 20px; box-sizing: border-box; }
+                    .card { background: #1e293b; padding: 2.5rem; border-radius: 1.25rem; box-shadow: 0 20px 30px rgba(0,0,0,0.5); text-align: center; max-width: 480px; width: 100%; border: 1px solid #334155; }
+                    .badge { background: #166534; color: #4ade80; font-weight: 700; padding: 6px 14px; border-radius: 9999px; display: inline-block; font-size: 0.875rem; margin-bottom: 1rem; }
+                    h2 { margin: 0 0 0.5rem 0; color: #f8fafc; font-size: 1.5rem; }
+                    p { color: #94a3b8; font-size: 0.95rem; line-height: 1.5; margin: 0.5rem 0 1.5rem 0; }
+                    .status-box { background: #0f172a; padding: 1.25rem; border-radius: 0.75rem; text-align: left; border: 1px solid #1e293b; }
+                    .status-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #334155; font-size: 0.9rem; }
+                    .status-item:last-child { border-bottom: none; }
+                    .success { color: #4ade80; font-weight: 600; }
+                    .pending { color: #fbbf24; font-weight: 600; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="badge">🟢 BOT EN LÍNEA</div>
+                    <h2>¡WhatsApp Conectado!</h2>
+                    <p>El bot ya está autenticado con tu sesión de WhatsApp. No requiere escanear el código QR.</p>
+                    <div class="status-box">
+                        <div class="status-item">
+                            <span>Estado del Servidor:</span>
+                            <span class="success">Activo (Ready)</span>
+                        </div>
+                        <div class="status-item">
+                            <span>Grupo Julio Varela:</span>
+                            <span class="${groupsMap.julio ? 'success' : 'pending'}">${groupsMap.julio ? '✅ Conectado' : '⚠️ Pendiente'}</span>
+                        </div>
+                        <div class="status-item">
+                            <span>Grupo Angel Curbelo:</span>
+                            <span class="${groupsMap.angel ? 'success' : 'pending'}">${groupsMap.angel ? '✅ Conectado' : '⚠️ Pendiente'}</span>
+                        </div>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `);
     }
+
+    if (!latestQRDataURL) {
+        return res.send(`
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Cargando Bot WhatsApp</title>
+                <meta http-equiv="refresh" content="5">
+                <style>
+                    body { font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0f172a; color: white; margin: 0; }
+                    .card { background: #1e293b; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; max-width: 400px; }
+                    .spinner { border: 4px solid rgba(255,255,255,0.1); width: 40px; height: 40px; border-radius: 50%; border-left-color: #3b82f6; animation: spin 1s linear infinite; margin: 0 auto 1.5rem auto; }
+                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                    p { color: #94a3b8; font-size: 0.9rem; margin-top: 0.5rem; }
+                </style>
+            </head>
+            <body>
+                <div class="card">
+                    <div class="spinner"></div>
+                    <h2>Inicializando cliente de WhatsApp...</h2>
+                    <p>Cargando sesión o preparando código QR. Esta página se actualizará automáticamente en unos segundos.</p>
+                </div>
+            </body>
+            </html>
+        `);
+    }
+
     res.send(`
         <!DOCTYPE html>
         <html>
@@ -108,7 +187,7 @@ app.get('/qr', (req, res) => {
             <title>Código QR WhatsApp Bot</title>
             <meta http-equiv="refresh" content="15">
             <style>
-                body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0f172a; color: white; margin: 0; }
+                body { font-family: system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0f172a; color: white; margin: 0; }
                 .card { background: #1e293b; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
                 img { width: 280px; height: 280px; border-radius: 8px; background: white; padding: 10px; }
                 p { color: #94a3b8; font-size: 0.9rem; margin-top: 1rem; }
@@ -146,6 +225,7 @@ async function resolveGroupLink(link) {
 
 // Al estar listo, resolver grupos
 client.on('ready', async () => {
+    isReady = true;
     console.clear();
     console.log('==================================================');
     console.log(' ¡Puente de WhatsApp EN LÍNEA y listo! ');
