@@ -7,12 +7,46 @@ service cloud.firestore {
       return request.auth != null;
     }
 
+    // Función auxiliar para validar cadenas opcionales con longitud máxima
+    function isValidString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    // Función de validación para Leads (Fase 3 - Anti-Inyección & Tamaño)
+    function isValidLead() {
+      let data = request.resource.data;
+      let allowedKeys = [
+        'name', 'phone', 'email', 'direccion', 'municipio', 
+        'consumo', 'isOwner', 'propertyType', 'roofType', 
+        'credit', 'battery', 'status', 'clientId', 'source', 
+        'product', 'score', 'scoreLabel', 'createdAt'
+      ];
+
+      return data.keys().hasOnly(allowedKeys)
+        && (data.name is string && data.name.size() > 0 && data.name.size() <= 100)
+        && (data.phone is string && data.phone.size() > 0 && data.phone.size() <= 30)
+        && isValidString(data, 'email', 100)
+        && isValidString(data, 'direccion', 200)
+        && isValidString(data, 'municipio', 100)
+        && isValidString(data, 'consumo', 50)
+        && isValidString(data, 'isOwner', 20)
+        && isValidString(data, 'propertyType', 50)
+        && isValidString(data, 'roofType', 50)
+        && isValidString(data, 'credit', 50)
+        && isValidString(data, 'battery', 50)
+        && isValidString(data, 'status', 50)
+        && isValidString(data, 'clientId', 50)
+        && isValidString(data, 'source', 50)
+        && isValidString(data, 'product', 50)
+        && isValidString(data, 'scoreLabel', 50);
+    }
+
     // Colección de Prospectos (Leads)
     match /leads/{leadId} {
-      // Permite que cualquiera envíe el formulario web de captación
-      allow create: if true; 
+      // Permite que cualquiera envíe un lead válido según el esquema estricto
+      allow create: if isValidLead(); 
       
-      // Solo tú o tus usuarios autenticados pueden ver, editar o borrar leads
+      // Solo usuarios autenticados pueden ver, editar o borrar leads
       allow read, update, delete: if isAuthenticated();
     }
 

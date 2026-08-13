@@ -5,11 +5,26 @@ const express = require('express');
 // Cargar variables de entorno locales si existen
 require('dotenv').config();
 
+// [HALLAZGO-BRIDGE-03] Manejadores globales para prevenir el colapso del proceso por errores de Puppeteer
+process.on('uncaughtException', (error) => {
+    console.error('❌ Excepción no capturada (uncaughtException):', error.message || error);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+    console.error('❌ Promesa rechazada no manejada (unhandledRejection):', reason);
+});
+
+// [HALLAZGO-BRIDGE-01] Validar que exista BRIDGE_SECRET antes de iniciar el servidor
+if (!process.env.BRIDGE_SECRET) {
+    console.error("❌ ERROR CRÍTICO DE SEGURIDAD: La variable de entorno 'BRIDGE_SECRET' no está definida.");
+    console.error("   Defina BRIDGE_SECRET en su archivo .env antes de iniciar la aplicación.");
+    process.exit(1);
+}
+
+const BRIDGE_SECRET = process.env.BRIDGE_SECRET;
+
 const app = express();
 app.use(express.json());
-
-// Token de seguridad requerido (Mover a tu archivo .env local)
-const BRIDGE_SECRET = process.env.BRIDGE_SECRET || 'CambiarEsteTokenUrgente2026';
 
 // Middleware para registrar peticiones entrantes
 app.use((req, res, next) => {
@@ -17,7 +32,7 @@ app.use((req, res, next) => {
     next();
 });
 
-// Middleware de Autenticación del Puente (Mitigación HIGH-04)
+// Middleware de Autenticación del Puente
 const verifyBridgeToken = (req, res, next) => {
     const token = req.headers['x-bridge-secret'];
     if (!token || token !== BRIDGE_SECRET) {
@@ -59,7 +74,7 @@ client.on('qr', (qr) => {
     console.log('==================================================\n');
 });
 
-// Al estar listo, resolver el enlace del grupo automáticamente
+// Al estar listo, resolver el enlace y unirse al grupo automáticamente
 client.on('ready', async () => {
     console.clear();
     console.log('==================================================');
@@ -67,11 +82,25 @@ client.on('ready', async () => {
     console.log('==================================================\n');
 
     try {
-        const inviteCode = GRUPO_INVITE_LINK.replace('https://chat.whatsapp.com/', '');
-        const groupChat = await client.getInviteInfo(inviteCode);
+        const inviteCode = GRUPO_INVITE_LINK.replace('https://chat.whatsapp.com/', '').split('?')[0];
         
-        targetGroupId = groupChat.id._serialized;
-        console.log(`📌 Grupo Enlazado Exitosamente: ${groupChat.subject}`);
+        try {
+            // Unir el bot al grupo usando el código de invitación
+            const joinedId = await client.acceptInvite(inviteCode);
+            if (joinedId) {
+                targetGroupId = typeof joinedId === 'string' ? joinedId : joinedId._serialized;
+                console.log(`✅ El Bot se ha unido al grupo automáticamente.`);
+            }
+        } catch (joinError) {
+            console.log(`ℹ️ Verificando estado en el grupo... (${joinError.message || joinError})`);
+        }
+
+        if (!targetGroupId) {
+            const groupChat = await client.getInviteInfo(inviteCode);
+            targetGroupId = groupChat.id._serialized;
+            console.log(`📌 Grupo Enlazado Exitosamente: ${groupChat.subject}`);
+        }
+
         console.log(`🆔 ID de Destino Guardado en Memoria: ${targetGroupId}\n`);
     } catch (error) {
         console.error('❌ Error crítico al resolver el enlace del grupo:', error.message);
@@ -90,17 +119,21 @@ client.on('disconnected', (reason) => {
 app.post('/api/send-message', verifyBridgeToken, async (req, res) => {
     const { mensaje } = req.body;
 
-    if (!mensaje) {
+    // [HALLAZGO-BRIDGE-03] Validación de string no vacío en req.body.mensaje
+    if (!mensaje || typeof mensaje !== 'string' || mensaje.trim() === '') {
+        console.warn(`⚠️ [BAD REQUEST] Parámetro "mensaje" ausente, no-string o vacío desde: ${req.ip}`);
         return res.status(400).json({ 
             success: false, 
-            error: 'Falta el parámetro obligatorio: "mensaje".' 
+            error: 'El parámetro obligatorio "mensaje" debe ser una cadena de texto (string) no vacía.' 
         });
     }
 
+    // [HALLAZGO-BRIDGE-02] Verificación de estado de sesión de WhatsApp / Puppeteer
     if (!targetGroupId) {
+        console.warn(`⚠️ [SERVICE UNAVAILABLE] Sesión de WhatsApp desconectada o ID de grupo destino no resuelto.`);
         return res.status(503).json({ 
             success: false, 
-            error: 'El puente de WhatsApp aún no ha resuelto el ID del grupo destino o el bot está desconectado.' 
+            error: 'El puente de WhatsApp no está disponible en este momento (sesión desconectada o degradada).' 
         });
     }
 
@@ -113,10 +146,12 @@ app.post('/api/send-message', verifyBridgeToken, async (req, res) => {
             message: 'Mensaje enviado al grupo con éxito.' 
         });
     } catch (error) {
-        console.error('❌ Error al despachar el mensaje al grupo:', error);
-        return res.status(500).json({ 
+        // [HALLAZGO-BRIDGE-02] Loguear advertencia sin colgar la petición en errores de Puppeteer/envío
+        console.warn('⚠️ Advertencia al intentar despachar mensaje vía Puppeteer:', error.message || error);
+        return res.status(503).json({ 
             success: false, 
-            error: error.message 
+            error: 'No se pudo enviar el mensaje debido a un problema con la sesión de WhatsApp.',
+            details: error.message 
         });
     }
 });

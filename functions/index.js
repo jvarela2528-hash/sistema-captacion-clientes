@@ -69,6 +69,7 @@ const CLIENT_PHONES = {
 const MASTER_MONITOR = '+17874596147'; // Angel siempre recibe copia de todo
 
 exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
+    if (!event.data) return;
     const lead = event.data.data();
     const leadId = event.params.leadId;
     const clientId = lead.clientId || 'julio';
@@ -83,6 +84,11 @@ exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
     console.log(`🚀 [SISTEMA] Nuevo lead para ${headerName} (ID: ${leadId})`);
 
     const makeWebhookUrl = "https://hook.us2.make.com/g4lwws1zrh77x7vt44nf49rwuogjjrux";
+
+    // AbortController con timeout de 10s [HALLAZGO-FUNC-03]
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
         const payload = {
             nombre: lead.name || "N/A",
@@ -102,34 +108,47 @@ exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify(payload)
+            body: JSON.stringify(payload),
+            signal: controller.signal
         });
+        clearTimeout(timeoutId);
         
         if (response.ok) {
             console.log(`✅ Webhook de Make notificado con éxito (Status: ${response.status})`);
         } else {
             console.error(`⚠️ Webhook de Make respondió con error (Status: ${response.status})`);
+            await event.data.ref.update({ notificationStatus: "failed" });
         }
     } catch (e) {
+        clearTimeout(timeoutId);
         console.error("❌ Error al llamar al webhook de Make:", e.message);
+        await event.data.ref.update({ notificationStatus: "failed" });
     }
 });
 
 // ====== NUEVO: GENERACIÓN DE IA CON CONTROL DE COSTOS ======
 exports.generateAIAsset = onCall({ timeoutSeconds: 120 }, async (request) => {
+    // Verificación de autenticación [HALLAZGO-FUNC-01]
+    if (!request.auth) {
+        return { error: "Usuario no autenticado." };
+    }
+
     const { prompt, type, clientId, model } = request.data;
     
     if (!prompt) return { error: "No prompt provided" };
 
     try {
         const admin = getAdmin();
+        const db = admin.firestore();
+        const usageRef = db.collection("usage").doc("stats");
+        const targetId = clientId || 'default';
+
         // 1. Verificar consumo actual en Firestore
-        const usageRef = admin.firestore().collection("usage").doc("stats");
         const usageDoc = await usageRef.get();
         let currentSpent = 0;
         
         if (usageDoc.exists) {
-            currentSpent = usageDoc.data()[clientId] || 0;
+            currentSpent = usageDoc.data()[targetId] || 0;
         }
 
         // Límite de $5.00 por CRM
@@ -142,29 +161,49 @@ exports.generateAIAsset = onCall({ timeoutSeconds: 120 }, async (request) => {
 
         if (type === "image") {
             console.log(`🎨 Generando imagen con DALL-E-3 para el prompt: ${prompt}`);
-            const ai = getOpenAI();
-            const response = await ai.images.generate({
-                model: "dall-e-3",
-                prompt: `Anuncio publicitario profesional y premium de energía solar en Puerto Rico. Tema: ${prompt}. Estilo: Fotografía realista de alta gama, iluminación cinematográfica, colores vibrantes y modernos. Sin texto en la imagen.`,
-                n: 1,
-                size: "1024x1024",
-                response_format: "b64_json"
-            });
-            
-            const imgData = response.data[0];
-            console.log("✅ Respuesta de OpenAI (Imagen) - keys:", Object.keys(imgData));
-            
-            if (imgData.url) {
-                result = imgData.url;
-                console.log("📎 Imagen recibida como URL");
-            } else if (imgData.b64_json) {
-                result = `data:image/png;base64,${imgData.b64_json}`;
-                console.log("📎 Imagen recibida como base64, convertida a data URI");
-            } else {
-                console.error("❌ Formato de imagen desconocido:", JSON.stringify(imgData).substring(0, 200));
-                return { error: "La IA generó la imagen pero en un formato no reconocido." };
+            try {
+                const ai = getOpenAI();
+                const response = await ai.images.generate({
+                    model: "dall-e-3",
+                    prompt: `Anuncio publicitario profesional y premium de energía solar en Puerto Rico. Tema: ${prompt}. Estilo: Fotografía realista de alta gama, iluminación cinematográfica, colores vibrantes y modernos. Sin texto en la imagen.`,
+                    n: 1,
+                    size: "1024x1024",
+                    response_format: "b64_json"
+                });
+                
+                const imgData = response.data[0];
+                console.log("✅ Respuesta de OpenAI (Imagen) - keys:", Object.keys(imgData));
+                
+                if (imgData.url) {
+                    result = imgData.url;
+                    console.log("📎 Imagen recibida como URL");
+                } else if (imgData.b64_json) {
+                    result = `data:image/png;base64,${imgData.b64_json}`;
+                    console.log("📎 Imagen recibida como base64, convertida a data URI");
+                } else {
+                    console.error("❌ Formato de imagen desconocido:", JSON.stringify(imgData).substring(0, 200));
+                    return { error: "La IA generó la imagen pero en un formato no reconocido." };
+                }
+                cost = 0.04;
+            } catch (dalleError) {
+                console.warn("⚠️ Falló DALL-E-3. Intentando con DALL-E-2...", dalleError.message);
+                try {
+                    const ai = getOpenAI();
+                    const response = await ai.images.generate({
+                        model: "dall-e-2",
+                        prompt: `Anuncio de energía solar en Puerto Rico: ${prompt}`,
+                        n: 1,
+                        size: "1024x1024",
+                        response_format: "b64_json"
+                    });
+                    const imgData = response.data[0];
+                    result = imgData.b64_json ? `data:image/png;base64,${imgData.b64_json}` : imgData.url;
+                    cost = 0.02;
+                } catch (dalle2Error) {
+                    console.error("❌ Fallaron ambas opciones de generación de imagen:", dalle2Error);
+                    return { error: "Error en la generación de imagen con IA." };
+                }
             }
-            cost = 0.04;
         } else {
             const systemInstruction = "Eres un experto en redactar anuncios virales. Tu tarea es entregar el texto del anuncio LISTO PARA PEGAR. NO incluyas etiquetas como 'Hook:', 'Texto corto:', ni introducciones. Solo el texto persuasivo con emojis. Al final incluye un llamado a la acción con el enlace proporcionado.";
             const userPrompt = `Redacta un anuncio irresistible para energía solar en Puerto Rico basado en: ${prompt}. Empieza con un hook potente y sigue con el cuerpo del mensaje. Al final pon: 👉 Cotiza gratis aquí: https://solar-leads-juliovmartinez.web.app/`;
@@ -223,13 +262,22 @@ exports.generateAIAsset = onCall({ timeoutSeconds: 120 }, async (request) => {
             }
         }
 
-        // 2. Actualizar consumo
-        const newTotal = currentSpent + cost;
-        const targetId = clientId || 'default';
-        await usageRef.set({
-            [targetId]: newTotal,
-            [`${targetId}_last_use`]: getAdmin().firestore.FieldValue.serverTimestamp()
-        }, { merge: true });
+        // 2. Transacción atómica para actualizar consumo [HALLAZGO-FUNC-02]
+        let newTotal = 0;
+        await db.runTransaction(async (transaction) => {
+            const docSnapshot = await transaction.get(usageRef);
+            const spent = docSnapshot.exists ? (docSnapshot.data()[targetId] || 0) : 0;
+
+            if (spent >= 5.00) {
+                throw new Error("Límite de presupuesto alcanzado ($5.00). Por favor recargue.");
+            }
+
+            newTotal = spent + cost;
+            transaction.set(usageRef, {
+                [targetId]: newTotal,
+                [`${targetId}_last_use`]: admin.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+        });
 
         return { 
             result, 
@@ -240,27 +288,22 @@ exports.generateAIAsset = onCall({ timeoutSeconds: 120 }, async (request) => {
     } catch (error) {
         console.error("❌ AI Error Detallado:", error);
         
-        let extraInfo = "";
-        try {
-            const ai = getOpenAI();
-            const models = await ai.models.list();
-            const modelIds = models.data.map(m => m.id).join(", ");
-            extraInfo = `\n\nModelos disponibles en tu cuenta: ${modelIds}`;
-        } catch (e) {
-            extraInfo = "\n\nNo se pudo listar los modelos.";
+        // Eliminada exposición de metadatos de modelos (OpenAI/Gemini) [HALLAZGO-FUNC-04]
+        if (error.message && error.message.includes("Límite de presupuesto")) {
+            return { error: error.message, limitReached: true };
         }
 
-        if (error.response) {
-            console.error("OpenAI Error Data:", error.response.data);
-            return { error: `OpenAI Error: ${error.response.data.error?.message || 'Error desconocido'}${extraInfo}` };
-        }
-
-        return { error: `Error de IA: ${error.message}${extraInfo}` };
+        return { error: "Error al generar el contenido con IA. Por favor intente más tarde." };
     }
 });
 
 // ====== OCR: EXTRAER LEADS DESDE FOTO ======
 exports.extractLeadsFromImage = onCall({ timeoutSeconds: 120 }, async (request) => {
+    // Verificación de autenticación [HALLAZGO-FUNC-01]
+    if (!request.auth) {
+        return { error: "Usuario no autenticado." };
+    }
+
     const { imageBase64 } = request.data;
     if (!imageBase64) return { error: "No se proporcionó imagen" };
 
@@ -295,12 +338,18 @@ exports.extractLeadsFromImage = onCall({ timeoutSeconds: 120 }, async (request) 
         return { leads: [], message: "No se encontraron leads en la imagen." };
     } catch (error) {
         console.error("❌ OCR Error:", error);
-        return { error: `Error al procesar imagen: ${error.message}` };
+        // Eliminada exposición de detalles internos del modelo [HALLAZGO-FUNC-04]
+        return { error: "Error al procesar la imagen con IA." };
     }
 });
 
 // ====== IA ASISTENTE DE COMUNICACIÓN ======
 exports.generateLeadMessage = onCall({ timeoutSeconds: 60 }, async (request) => {
+    // Verificación de autenticación [HALLAZGO-FUNC-01]
+    if (!request.auth) {
+        return { error: "Usuario no autenticado." };
+    }
+
     const { lead, objective, tone, model } = request.data;
     if (!lead) return { error: "Datos del prospecto incompletos." };
 
@@ -371,7 +420,8 @@ REGLAS DE ORO (CRÍTICO PARA NO SONAR COMO ROBOT):
         return { message };
     } catch (error) {
         console.error("❌ AI Comm Error:", error);
-        return { error: `Error al generar mensaje: ${error.message}` };
+        // Eliminada exposición de detalles internos del modelo [HALLAZGO-FUNC-04]
+        return { error: "Error al generar el mensaje con IA." };
     }
 });
 

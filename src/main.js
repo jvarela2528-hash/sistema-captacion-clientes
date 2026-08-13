@@ -43,11 +43,11 @@ async function submitLead() {
     btn.innerText = 'Enviando...';
 
     try {
-        currentLeadData.name = document.getElementById('full-name').value;
-        currentLeadData.phone = document.getElementById('phone').value;
-        currentLeadData.email = document.getElementById('email').value;
-        currentLeadData.direccion = document.getElementById('address').value;
-        currentLeadData.municipio = document.getElementById('municipio').value;
+        currentLeadData.name = document.getElementById('full-name')?.value?.trim() || '';
+        currentLeadData.phone = document.getElementById('phone')?.value?.trim() || '';
+        currentLeadData.email = document.getElementById('email')?.value?.trim() || '';
+        currentLeadData.direccion = document.getElementById('address')?.value?.trim() || '';
+        currentLeadData.municipio = document.getElementById('municipio')?.value?.trim() || '';
 
         if (!currentLeadData.name || !currentLeadData.phone) {
             alert('Por favor completa tu nombre y teléfono.');
@@ -77,12 +77,16 @@ async function submitLead() {
             scoreLabel = '❄️ Cold';
         }
 
-        await addDoc(collection(db, 'leads'), {
+        console.log("📤 Guardando lead en Firestore...", currentLeadData);
+
+        const docRef = await addDoc(collection(db, 'leads'), {
             ...currentLeadData,
             score: score,
             scoreLabel: scoreLabel,
             createdAt: serverTimestamp()
         });
+
+        console.log("✅ Lead guardado exitosamente con ID:", docRef.id);
 
         document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
         const successStep = document.getElementById('step-success');
@@ -90,8 +94,8 @@ async function submitLead() {
         updateProgress(100);
 
     } catch (error) {
-        console.error("Error:", error);
-        alert('Error al enviar.');
+        console.error("❌ Error al enviar el lead a Firestore:", error);
+        alert('Error al enviar el formulario. Por favor verifica tu conexión e intenta de nuevo.');
         btn.disabled = false;
         btn.innerText = 'Obtener Mi Análisis Gratis';
     }

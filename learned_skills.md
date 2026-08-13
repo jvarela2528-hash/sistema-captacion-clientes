@@ -37,5 +37,10 @@ Estructura para entrenamiento de ventas:
 - Medidores de "Confianza" y "Empatía" basados en la interacción.
 - Log de transcripción para revisión de feedback inmediato.
 
+## 6. Integración con Make (Webhooks y Cuenta)
+- **Cuenta de Make asociada:** `iavarelaj@gmail.com`
+- **Webhook activo en producción (`functions/index.js`):** `https://hook.us2.make.com/g4lwws1zrh77x7vt44nf49rwuogjjrux`
+- Cuando se consulte sobre el webhook de Make para este proyecto, señalar siempre que el escenario está bajo la cuenta `iavarelaj@gmail.com`.
+
 ---
 *Este archivo sirve como base de conocimiento para replicar estas funcionalidades en nuevos proyectos de CRM.*
