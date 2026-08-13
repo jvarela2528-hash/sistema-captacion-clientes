@@ -42,9 +42,14 @@ const verifyBridgeToken = (req, res, next) => {
     next();
 };
 
-// Enlace de invitación del grupo
-const GRUPO_INVITE_LINK = 'https://chat.whatsapp.com/E8HqDkHqpCXDd4OcPhhpiR';
-let targetGroupId = null;
+// Enlaces de invitación de grupos (pueden ser configurados en .env)
+const GRUPO_JULIO_LINK = process.env.GRUPO_JULIO_LINK || 'https://chat.whatsapp.com/E8HqDkHqpCXDd4OcPhhpiR';
+const GRUPO_ANGEL_LINK = process.env.GRUPO_ANGEL_LINK || '';
+
+let groupsMap = {
+    julio: null,
+    angel: null
+};
 
 // Inicializar cliente de WhatsApp con persistencia de sesión local
 const client = new Client({
@@ -65,92 +70,157 @@ const client = new Client({
     }
 });
 
-// Escuchar y pintar el código QR en la terminal
-client.on('qr', (qr) => {
+const QRCode = require('qrcode');
+const path = require('path');
+let latestQRDataURL = null;
+
+// Escuchar y guardar el código QR como imagen y en memoria
+client.on('qr', async (qr) => {
     console.clear();
     qrcode.generate(qr, { small: true });
     console.log('\n==================================================');
     console.log(' Escanea este código QR con el WhatsApp del Bot');
     console.log('==================================================\n');
+
+    try {
+        latestQRDataURL = await QRCode.toDataURL(qr);
+        await QRCode.toFile(path.join(__dirname, 'qr.png'), qr);
+        console.log('📸 Código QR guardado como "qr.png" y disponible en http://localhost:3001/qr');
+    } catch (err) {
+        console.error('Error guardando imagen QR:', err.message);
+    }
 });
 
-// Al estar listo, resolver el enlace y unirse al grupo automáticamente
+// Endpoint público para ver el QR directamente en el navegador
+app.get('/qr', (req, res) => {
+    if (!latestQRDataURL) {
+        return res.send('<h2>El puente de WhatsApp ya está autenticado o cargando el código QR... Refresca en unos segundos.</h2>');
+    }
+    res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Código QR WhatsApp Bot</title>
+            <meta http-equiv="refresh" content="15">
+            <style>
+                body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; background: #0f172a; color: white; margin: 0; }
+                .card { background: #1e293b; padding: 2rem; border-radius: 1rem; box-shadow: 0 10px 25px rgba(0,0,0,0.5); text-align: center; }
+                img { width: 280px; height: 280px; border-radius: 8px; background: white; padding: 10px; }
+                p { color: #94a3b8; font-size: 0.9rem; margin-top: 1rem; }
+            </style>
+        </head>
+        <body>
+            <div class="card">
+                <h2>Escanea este código QR con WhatsApp</h2>
+                <img src="${latestQRDataURL}" alt="Código QR WhatsApp" />
+                <p>La página se actualiza automáticamente cada 15 segundos.</p>
+            </div>
+        </body>
+        </html>
+    `);
+});
+
+// Helper para resolver enlace de grupo
+async function resolveGroupLink(link) {
+    if (!link || !link.includes('chat.whatsapp.com/')) return null;
+    try {
+        const inviteCode = link.replace('https://chat.whatsapp.com/', '').split('?')[0];
+        try {
+            const joinedId = await client.acceptInvite(inviteCode);
+            if (joinedId) return typeof joinedId === 'string' ? joinedId : joinedId._serialized;
+        } catch (e) {
+            // Ya está en el grupo
+        }
+        const groupChat = await client.getInviteInfo(inviteCode);
+        return groupChat.id._serialized;
+    } catch (err) {
+        console.error(`⚠️ No se pudo resolver enlace ${link}:`, err.message);
+        return null;
+    }
+}
+
+// Al estar listo, resolver grupos
 client.on('ready', async () => {
     console.clear();
     console.log('==================================================');
     console.log(' ¡Puente de WhatsApp EN LÍNEA y listo! ');
     console.log('==================================================\n');
 
+    // 1. Escanear chats existentes para detectar grupos por nombre
     try {
-        const inviteCode = GRUPO_INVITE_LINK.replace('https://chat.whatsapp.com/', '').split('?')[0];
-        
-        try {
-            // Unir el bot al grupo usando el código de invitación
-            const joinedId = await client.acceptInvite(inviteCode);
-            if (joinedId) {
-                targetGroupId = typeof joinedId === 'string' ? joinedId : joinedId._serialized;
-                console.log(`✅ El Bot se ha unido al grupo automáticamente.`);
+        const chats = await client.getChats();
+        const groups = chats.filter(c => c.isGroup);
+        console.log(`📋 Grupos detectados en WhatsApp (${groups.length}):`);
+        groups.forEach(g => {
+            console.log(` - Group: "${g.name}" | ID: ${g.id._serialized}`);
+            const nameLower = g.name.toLowerCase();
+            if (nameLower.includes('angel') || nameLower.includes('curbelo')) {
+                groupsMap.angel = g.id._serialized;
+                console.log(`   👉 Asignado a proyecto ANGEL`);
+            } else if (nameLower.includes('julio') || nameLower.includes('captacion') || nameLower.includes('solar')) {
+                groupsMap.julio = g.id._serialized;
+                console.log(`   👉 Asignado a proyecto JULIO`);
             }
-        } catch (joinError) {
-            console.log(`ℹ️ Verificando estado en el grupo... (${joinError.message || joinError})`);
-        }
-
-        if (!targetGroupId) {
-            const groupChat = await client.getInviteInfo(inviteCode);
-            targetGroupId = groupChat.id._serialized;
-            console.log(`📌 Grupo Enlazado Exitosamente: ${groupChat.subject}`);
-        }
-
-        console.log(`🆔 ID de Destino Guardado en Memoria: ${targetGroupId}\n`);
-    } catch (error) {
-        console.error('❌ Error crítico al resolver el enlace del grupo:', error.message);
+        });
+    } catch (e) {
+        console.error('Error escaneando grupos:', e.message);
     }
+
+    // 2. Resolver por enlaces si aún no están asignados
+    if (!groupsMap.julio && GRUPO_JULIO_LINK) {
+        groupsMap.julio = await resolveGroupLink(GRUPO_JULIO_LINK);
+    }
+    if (!groupsMap.angel && GRUPO_ANGEL_LINK) {
+        groupsMap.angel = await resolveGroupLink(GRUPO_ANGEL_LINK);
+    }
+
+    console.log('\n📌 Mapeo final de Grupos:');
+    console.log(' - Julio / Captación:', groupsMap.julio || 'Pendiente de enlace/nombre');
+    console.log(' - Angel Curbelo:', groupsMap.angel || 'Pendiente de enlace/nombre\n');
 });
 
-// Manejo de desconexión para re-autenticación limpia
+// Manejo de desconexión
 client.on('disconnected', (reason) => {
     console.warn('⚠️ Cliente de WhatsApp desconectado. Razón:', reason);
-    targetGroupId = null;
-    // Forzar reinicio del cliente si es necesario
+    groupsMap = { julio: null, angel: null };
     client.initialize().catch(err => console.error('Error re-inicializando:', err.message));
 });
 
-// Endpoint POST blindado para recibir leads desde Make o tu CRM interno
+// Endpoint POST blindado para recibir leads desde Make o CRM
 app.post('/api/send-message', verifyBridgeToken, async (req, res) => {
-    const { mensaje } = req.body;
+    const { mensaje, clientId } = req.body;
 
-    // [HALLAZGO-BRIDGE-03] Validación de string no vacío en req.body.mensaje
     if (!mensaje || typeof mensaje !== 'string' || mensaje.trim() === '') {
-        console.warn(`⚠️ [BAD REQUEST] Parámetro "mensaje" ausente, no-string o vacío desde: ${req.ip}`);
         return res.status(400).json({ 
             success: false, 
-            error: 'El parámetro obligatorio "mensaje" debe ser una cadena de texto (string) no vacía.' 
+            error: 'El parámetro obligatorio "mensaje" debe ser una cadena de texto no vacía.' 
         });
     }
 
-    // [HALLAZGO-BRIDGE-02] Verificación de estado de sesión de WhatsApp / Puppeteer
+    // Determinar grupo destino
+    const targetKey = (clientId && clientId.toLowerCase() === 'angel') ? 'angel' : 'julio';
+    const targetGroupId = groupsMap[targetKey] || groupsMap.julio || groupsMap.angel;
+
     if (!targetGroupId) {
-        console.warn(`⚠️ [SERVICE UNAVAILABLE] Sesión de WhatsApp desconectada o ID de grupo destino no resuelto.`);
+        console.warn(`⚠️ [SERVICE UNAVAILABLE] ID de grupo destino no resuelto para cliente: ${targetKey}`);
         return res.status(503).json({ 
             success: false, 
-            error: 'El puente de WhatsApp no está disponible en este momento (sesión desconectada o degradada).' 
+            error: `No hay grupo de WhatsApp asignado para el cliente '${targetKey}'.` 
         });
     }
 
     try {
-        // Enviar el lead directamente al grupo de forma atómica
         await client.sendMessage(targetGroupId, mensaje);
-        console.log(`✅ Lead enviado con éxito al grupo.`);
+        console.log(`✅ Lead enviado con éxito al grupo (${targetKey}): ${targetGroupId}`);
         return res.status(200).json({ 
             success: true, 
-            message: 'Mensaje enviado al grupo con éxito.' 
+            message: `Mensaje enviado al grupo de ${targetKey} con éxito.` 
         });
     } catch (error) {
-        // [HALLAZGO-BRIDGE-02] Loguear advertencia sin colgar la petición en errores de Puppeteer/envío
-        console.warn('⚠️ Advertencia al intentar despachar mensaje vía Puppeteer:', error.message || error);
+        console.warn('⚠️ Advertencia al intentar enviar mensaje vía WhatsApp:', error.message || error);
         return res.status(503).json({ 
             success: false, 
-            error: 'No se pudo enviar el mensaje debido a un problema con la sesión de WhatsApp.',
+            error: 'No se pudo enviar el mensaje al grupo de WhatsApp.',
             details: error.message 
         });
     }

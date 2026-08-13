@@ -9,7 +9,8 @@ const testLead = {
   techo: "Concreto",
   credito: "750+",
   bateria: "Con Batería",
-  calificacion: "🔥 Hot"
+  calificacion: "🔥 Hot",
+  clientId: "julio"
 };
 
 console.log("Enviando lead de prueba al webhook de Make...");

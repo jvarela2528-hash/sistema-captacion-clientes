@@ -99,7 +99,8 @@ exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
             techo: lead.roofType || "N/A",
             credito: lead.credit || "N/A",
             bateria: lead.battery || "N/A",
-            calificacion: lead.scoreLabel || "Normal"
+            calificacion: lead.scoreLabel || "Normal",
+            clientId: clientId
         };
         
         console.log(`📤 Enviando datos al webhook de Make para lead ${leadId}...`);
