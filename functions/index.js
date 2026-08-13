@@ -72,10 +72,12 @@ exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
     if (!event.data) return;
     const lead = event.data.data();
     const leadId = event.params.leadId;
-    const clientId = lead.clientId || 'julio';
+    const rawClientId = (lead.clientId || '').toLowerCase();
+    const isAngel = rawClientId === 'angel' || rawClientId === 'curbelo';
+    const clientId = isAngel ? 'angel' : (rawClientId || 'julio');
 
     // Determinar nombre de la cabecera
-    const headerName = clientId === 'julio' ? 'JULIO VARELA MARTINEZ' : 'ANGEL CURBELO SALES';
+    const headerName = isAngel ? 'ANGEL CURBELO SALES' : 'JULIO VARELA MARTINEZ';
     
     // Determinar destinatarios (Número del cliente + Copia para Angel)
     const primaryPhone = CLIENT_PHONES[clientId] || CLIENT_PHONES['default'];
@@ -91,12 +93,12 @@ exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
 
     try {
         const payload = {
-            nombre: lead.name || "N/A",
-            telefono: lead.phone || "N/A",
+            nombre: lead.name || lead.nombre || "N/A",
+            telefono: lead.phone || lead.telefono || "N/A",
             email: lead.email || "N/A",
-            pueblo: lead.municipio || "N/A",
+            pueblo: lead.municipio || lead.pueblo || "N/A",
             servicio: lead.service || lead.product || "Solar",
-            factura: lead.consumo || "N/A",
+            factura: lead.consumo || lead.factura || "N/A",
             techo: lead.roofType || "N/A",
             credito: lead.credit || "N/A",
             bateria: lead.battery || "N/A",

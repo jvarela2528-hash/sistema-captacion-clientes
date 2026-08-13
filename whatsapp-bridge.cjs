@@ -49,7 +49,7 @@ const verifyBridgeToken = (req, res, next) => {
 
 // Enlaces de invitación de grupos (pueden ser configurados en .env)
 const GRUPO_JULIO_LINK = process.env.GRUPO_JULIO_LINK || 'https://chat.whatsapp.com/E8HqDkHqpCXDd4OcPhhpiR';
-const GRUPO_ANGEL_LINK = process.env.GRUPO_ANGEL_LINK || '';
+const GRUPO_ANGEL_LINK = process.env.GRUPO_ANGEL_LINK || 'https://chat.whatsapp.com/Geh9ryPRoZ4KXPh5KiQ0Iy';
 
 let groupsMap = {
     julio: null,
@@ -245,7 +245,7 @@ app.post('/api/send-message', verifyBridgeToken, async (req, res) => {
     }
 
     // Determinar grupo destino
-    const targetKey = (clientId && clientId.toLowerCase() === 'angel') ? 'angel' : 'julio';
+    const targetKey = (clientId && (clientId.toLowerCase() === 'angel' || clientId.toLowerCase() === 'curbelo')) ? 'angel' : 'julio';
     const targetGroupId = groupsMap[targetKey] || groupsMap.julio || groupsMap.angel;
 
     if (!targetGroupId) {

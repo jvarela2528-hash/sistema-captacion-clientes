@@ -15,5 +15,14 @@ export const CLIENTS = {
         allowedSources: ['direct', 'cuestionario-web'],
         restrictedToProduct: 'Solar',
         sections: ['leads', 'marketing', 'stats', 'archive']
+    },
+    'angel': {
+        id: 'angel',
+        name: 'Angel Curbelo',
+        password: 'AngelSolar2026',
+        role: 'client',
+        allowedSources: ['direct', 'cuestionario-web'],
+        restrictedToProduct: 'Solar',
+        sections: ['leads', 'marketing', 'stats', 'archive']
     }
 };
