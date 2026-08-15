@@ -11,12 +11,10 @@ service-account.json
 !firebase.json
 !firestore.indexes.json
 
-# Sesiones de WhatsApp Web y Caches (HIGH-05)
+# Sesiones de WhatsApp (Baileys y Legadas)
+auth_info_baileys/
 .wwebjs_auth/
 .wwebjs_cache/
-*_session.json
-user_data_chrome*/
-user_data_chrome_yo/
 .puppeteer-cache/
 
 # Logs de error y depuración masiva (HIGH-08)

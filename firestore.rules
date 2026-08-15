@@ -55,6 +55,12 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // Colección de Sesión WhatsApp (Baileys)
+    // Permite al bridge de Render leer/escribir credenciales de sesión
+    match /whatsapp_auth/{docId} {
+      allow read, write: if true;
+    }
+
     // Regla de Cierre Segura: Deniega cualquier acceso a colecciones no especificadas
     match /{document=**} {
       allow read, write: if false;

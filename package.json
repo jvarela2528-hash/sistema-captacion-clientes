@@ -1,27 +1,23 @@
 {
   "name": "sistema-de-captacion-clientes",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node whatsapp-bridge.cjs",
+    "start": "node whatsapp-bridge.js",
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "whatsapp-bridge": "node whatsapp-bridge.cjs"
+    "preview": "vite preview"
   },
   "devDependencies": {
     "vite": "^8.0.10"
   },
   "dependencies": {
-    "@sparticuz/chromium": "^149.0.0",
+    "@whiskeysockets/baileys": "^6.7.16",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "firebase": "^12.13.0",
-    "puppeteer": "^24.3.0",
-    "puppeteer-core": "^25.7.0",
-    "qrcode": "^1.5.4",
-    "qrcode-terminal": "^0.12.0",
-    "whatsapp-web.js": "^1.34.7"
+    "pino": "^9.6.0",
+    "qrcode": "^1.5.4"
   }
 }
