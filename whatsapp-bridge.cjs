@@ -312,6 +312,8 @@ app.listen(PORT, () => {
                 '--disable-default-apps',
                 '--mute-audio',
                 '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process,TranslateUI,BlinkGenPropertyTrees',
+                '--disk-cache-size=10485760',
+                '--media-cache-size=10485760',
                 '--js-flags=--max-old-space-size=128'
             ]
         }
@@ -347,25 +349,20 @@ app.listen(PORT, () => {
         console.log('==================================================');
         console.log(' ¡Puente de WhatsApp EN LÍNEA y listo! ');
         console.log('==================================================\n');
+        
         try {
-            const chats = await client.getChats();
-            const groups = chats.filter(c => c.isGroup);
-            console.log(`📋 Grupos detectados (${groups.length}):`);
-            groups.forEach(g => {
-                console.log(` - "${g.name}" | ID: ${g.id._serialized}`);
-                const nameLower = g.name.toLowerCase();
-                if (nameLower.includes('angel') || nameLower.includes('curbelo')) {
-                    groupsMap.angel = g.id._serialized;
-                } else if (nameLower.includes('julio') || nameLower.includes('captacion') || nameLower.includes('solar')) {
-                    groupsMap.julio = g.id._serialized;
-                }
-            });
+            if (!groupsMap.julio && GRUPO_JULIO_LINK) {
+                console.log('🔍 Resolviendo enlace de grupo Julio...');
+                groupsMap.julio = await resolveGroupLink(GRUPO_JULIO_LINK);
+            }
+            if (!groupsMap.angel && GRUPO_ANGEL_LINK) {
+                console.log('🔍 Resolviendo enlace de grupo Angel...');
+                groupsMap.angel = await resolveGroupLink(GRUPO_ANGEL_LINK);
+            }
+            console.log('📌 Grupos configurados:', groupsMap);
         } catch (e) {
-            console.error('Error escaneando grupos:', e.message);
+            console.error('⚠️ Error al configurar grupos:', e.message);
         }
-        if (!groupsMap.julio && GRUPO_JULIO_LINK) groupsMap.julio = await resolveGroupLink(GRUPO_JULIO_LINK);
-        if (!groupsMap.angel && GRUPO_ANGEL_LINK) groupsMap.angel = await resolveGroupLink(GRUPO_ANGEL_LINK);
-        console.log('\n📌 Grupos:', groupsMap);
     });
 
     client.on('disconnected', (reason) => {
