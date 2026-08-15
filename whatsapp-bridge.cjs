@@ -301,20 +301,30 @@ app.listen(PORT, () => {
                 '--disable-setuid-sandbox',
                 '--disable-dev-shm-usage',
                 '--disable-accelerated-2d-canvas',
+                '--disable-gpu',
+                '--disable-software-rasterizer',
                 '--no-first-run',
                 '--no-zygote',
-                '--single-process',
-                '--disable-gpu',
+                '--renderer-process-limit=1',
                 '--disable-extensions',
                 '--disable-background-networking',
                 '--disable-sync',
                 '--disable-default-apps',
                 '--mute-audio',
-                '--disable-features=site-per-process,TranslateUI,BlinkGenPropertyTrees',
-                '--js-flags="--max-old-space-size=180"'
+                '--disable-features=AudioServiceOutOfProcess,IsolateOrigins,site-per-process,TranslateUI,BlinkGenPropertyTrees',
+                '--js-flags=--max-old-space-size=128'
             ]
         }
     });
+
+    // Recolección periódica de basura para mantener la memoria bajo 250MB
+    if (global.gc) {
+        setInterval(() => {
+            try {
+                global.gc();
+            } catch (e) {}
+        }, 30000);
+    }
 
     // Re-registrar eventos en el nuevo cliente
     client.on('qr', async (qr) => {

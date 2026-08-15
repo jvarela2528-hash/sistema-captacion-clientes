@@ -4,9 +4,11 @@ services:
     env: node
     plan: free
     buildCommand: npm install && PUPPETEER_CACHE_DIR=/opt/render/project/src/.puppeteer-cache npx puppeteer browsers install chrome
-    startCommand: node whatsapp-bridge.cjs
+    startCommand: node --max-old-space-size=160 --expose-gc whatsapp-bridge.cjs
     envVars:
       - key: NODE_ENV
         value: production
       - key: PUPPETEER_CACHE_DIR
         value: /opt/render/project/src/.puppeteer-cache
+      - key: NODE_OPTIONS
+        value: --max-old-space-size=160
