@@ -73,7 +73,11 @@ exports.onNewLead = onDocumentCreated("leads/{leadId}", async (event) => {
     const lead = event.data.data();
     const leadId = event.params.leadId;
     const rawClientId = (lead.clientId || '').toLowerCase();
-    const isAngel = rawClientId === 'angel' || rawClientId === 'curbelo';
+    const isAngel = rawClientId === 'angel' || 
+                    rawClientId === 'curbelo' || 
+                    (typeof lead.agente_asignado === 'string' && lead.agente_asignado.toLowerCase().includes('angel')) ||
+                    process.env.GCLOUD_PROJECT === 'angel-curbelo-sales-crm' ||
+                    (typeof process.env.FIREBASE_CONFIG === 'string' && process.env.FIREBASE_CONFIG.includes('angel-curbelo-sales-crm'));
     const clientId = isAngel ? 'angel' : (rawClientId || 'julio');
 
     // Determinar nombre de la cabecera
